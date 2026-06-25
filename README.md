@@ -20,19 +20,25 @@
 GitHub 一键执行交互菜单：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o /tmp/ipv6.sh && chmod +x /tmp/ipv6.sh && sudo /tmp/ipv6.sh
+bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh)
 ```
 
 GitHub 一键永久关闭 IPv6：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o /tmp/ipv6.sh && chmod +x /tmp/ipv6.sh && sudo /tmp/ipv6.sh disable-perm
+bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh) disable-perm
 ```
 
 GitHub 一键永久开启 IPv6：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o /tmp/ipv6.sh && chmod +x /tmp/ipv6.sh && sudo /tmp/ipv6.sh enable-perm
+bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh) enable-perm
+```
+
+如果你想要最稳妥、兼容性更高的写法，也可以先下载再执行：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o /tmp/ipv6.sh && chmod +x /tmp/ipv6.sh && sudo /tmp/ipv6.sh
 ```
 
 本地执行：
