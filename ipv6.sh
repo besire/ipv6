@@ -1,7 +1,7 @@
 #!/bin/sh
 
-# IPv6 one-click control script for common Linux distributions.
-# Supports runtime status, temporary disable/enable, and persistent disable/enable.
+# 适用于常见 Linux 发行版的 IPv6 一键控制脚本。
+# 支持状态查询、临时关闭/开启、永久关闭/开启。
 
 SCRIPT_NAME=${0##*/}
 MANAGED_SYSCTL_FILE="/etc/sysctl.d/99-ipv6-control.conf"
@@ -22,25 +22,25 @@ else
     RESET=""
 fi
 
-info() { printf '%s\n' "${BLUE}==>${RESET} $*"; }
-ok() { printf '%s\n' "${GREEN}OK:${RESET} $*"; }
-warn() { printf '%s\n' "${YELLOW}WARN:${RESET} $*"; }
-err() { printf '%s\n' "${RED}ERROR:${RESET} $*" >&2; }
+info() { printf '%s\n' "${BLUE}提示:${RESET} $*"; }
+ok() { printf '%s\n' "${GREEN}成功:${RESET} $*"; }
+warn() { printf '%s\n' "${YELLOW}警告:${RESET} $*"; }
+err() { printf '%s\n' "${RED}错误:${RESET} $*" >&2; }
 
 usage() {
     cat <<EOF
-${BOLD}IPv6 control script${RESET}
+${BOLD}IPv6 控制脚本${RESET}
 
-Usage:
-  ./${SCRIPT_NAME}                 Interactive menu
-  ./${SCRIPT_NAME} status          Show IPv6 status
-  ./${SCRIPT_NAME} disable-temp    Disable IPv6 until reboot or network reload
-  ./${SCRIPT_NAME} disable-perm    Disable IPv6 persistently and apply now
-  ./${SCRIPT_NAME} enable-temp     Enable IPv6 for current runtime
-  ./${SCRIPT_NAME} enable-perm     Remove this script's persistent disable file and apply now
-  ./${SCRIPT_NAME} help            Show this help
+用法:
+  ./${SCRIPT_NAME}                 交互菜单
+  ./${SCRIPT_NAME} status          查看 IPv6 状态
+  ./${SCRIPT_NAME} disable-temp    临时关闭 IPv6，重启或网络重载后可能恢复
+  ./${SCRIPT_NAME} disable-perm    永久关闭 IPv6，并立即生效
+  ./${SCRIPT_NAME} enable-temp     临时开启 IPv6
+  ./${SCRIPT_NAME} enable-perm     删除本脚本创建的永久关闭配置，并立即生效
+  ./${SCRIPT_NAME} help            显示帮助
 
-Examples:
+示例:
   sudo ./${SCRIPT_NAME} disable-perm
   sudo ./${SCRIPT_NAME} enable-perm
   ./${SCRIPT_NAME} status
@@ -53,7 +53,7 @@ is_root() {
 
 need_root() {
     if ! is_root; then
-        err "This action requires root. Please run with sudo or as root."
+        err "该操作需要 root 权限，请使用 sudo 或以 root 身份执行。"
         exit 1
     fi
 }
@@ -64,7 +64,7 @@ ipv6_kernel_available() {
 
 need_ipv6_kernel() {
     if ! ipv6_kernel_available; then
-        err "IPv6 kernel controls are not available. IPv6 may be missing from this kernel/container."
+        err "当前内核未暴露 IPv6 控制接口。此系统或容器可能未启用 IPv6。"
         exit 1
     fi
 }
@@ -77,7 +77,7 @@ set_disable_flag_path() {
         if ( printf '%s\n' "$value" > "$path" ) 2>/dev/null; then
             return 0
         fi
-        warn "Failed to write $path"
+        warn "写入失败：$path"
         return 1
     fi
 
@@ -99,7 +99,7 @@ apply_runtime_value() {
     done
 
     if [ "$failed" -ne 0 ]; then
-        err "Some IPv6 runtime flags could not be changed."
+        err "部分 IPv6 运行时标志无法修改。"
         return 1
     fi
 
@@ -107,17 +107,17 @@ apply_runtime_value() {
 }
 
 disable_temp() {
-    info "Disabling IPv6 for the current runtime..."
+    info "正在临时关闭 IPv6..."
     apply_runtime_value 1
-    ok "IPv6 has been disabled temporarily."
-    warn "This may be reset after reboot, network service reload, or interface recreation."
+    ok "IPv6 已临时关闭。"
+    warn "重启、网络服务重载或网卡重建后，可能会恢复。"
 }
 
 enable_temp() {
-    info "Enabling IPv6 for the current runtime..."
+    info "正在临时开启 IPv6..."
     apply_runtime_value 0
-    ok "IPv6 has been enabled for the current runtime."
-    warn "If another sysctl file disables IPv6 at boot, it may be disabled again after reboot."
+    ok "IPv6 已在当前运行时开启。"
+    warn "如果其他 sysctl 配置在启动时关闭 IPv6，重启后仍可能再次被关闭。"
 }
 
 write_persistent_disable_file() {
@@ -125,7 +125,7 @@ write_persistent_disable_file() {
 
     if [ ! -d /etc/sysctl.d ]; then
         mkdir -p /etc/sysctl.d || {
-            err "Failed to create /etc/sysctl.d"
+            err "创建 /etc/sysctl.d 失败"
             exit 1
         }
     fi
@@ -133,31 +133,31 @@ write_persistent_disable_file() {
     tmp_file="${MANAGED_SYSCTL_FILE}.$$"
     umask 022
     {
-        printf '%s\n' "# Managed by ${SCRIPT_NAME}"
-        printf '%s\n' "# Remove this file or run: ${SCRIPT_NAME} enable-perm"
+        printf '%s\n' "# 由 ${SCRIPT_NAME} 管理"
+        printf '%s\n' "# 删除此文件，或执行：${SCRIPT_NAME} enable-perm"
         printf '%s\n' "net.ipv6.conf.all.disable_ipv6 = 1"
         printf '%s\n' "net.ipv6.conf.default.disable_ipv6 = 1"
         printf '%s\n' "net.ipv6.conf.lo.disable_ipv6 = 1"
     } > "$tmp_file" || {
-        err "Failed to write $tmp_file"
+        err "写入失败：$tmp_file"
         exit 1
     }
 
     mv "$tmp_file" "$MANAGED_SYSCTL_FILE" || {
         rm -f "$tmp_file" 2>/dev/null
-        err "Failed to install $MANAGED_SYSCTL_FILE"
+        err "安装失败：$MANAGED_SYSCTL_FILE"
         exit 1
     }
 }
 
 disable_perm() {
-    info "Installing persistent IPv6 disable sysctl file..."
+    info "正在写入永久关闭 IPv6 的 sysctl 配置..."
     write_persistent_disable_file
-    ok "Persistent config written to $MANAGED_SYSCTL_FILE"
+    ok "已写入永久配置：$MANAGED_SYSCTL_FILE"
 
-    info "Applying disable setting now..."
+    info "正在立即应用关闭设置..."
     apply_runtime_value 1
-    ok "IPv6 is disabled now and will stay disabled after reboot on normal sysctl-based systems."
+    ok "IPv6 已关闭。对于常规 sysctl 系统，重启后也会保持关闭。"
 }
 
 remove_persistent_disable_file() {
@@ -165,22 +165,22 @@ remove_persistent_disable_file() {
 
     if [ -f "$MANAGED_SYSCTL_FILE" ]; then
         rm -f "$MANAGED_SYSCTL_FILE" || {
-            err "Failed to remove $MANAGED_SYSCTL_FILE"
+            err "删除失败：$MANAGED_SYSCTL_FILE"
             exit 1
         }
-        ok "Removed $MANAGED_SYSCTL_FILE"
+        ok "已删除：$MANAGED_SYSCTL_FILE"
     else
-        info "No managed persistent config found at $MANAGED_SYSCTL_FILE"
+        info "未找到本脚本管理的永久配置：$MANAGED_SYSCTL_FILE"
     fi
 }
 
 enable_perm() {
-    info "Removing this script's persistent IPv6 disable config..."
+    info "正在删除本脚本创建的永久关闭配置..."
     remove_persistent_disable_file
 
-    info "Applying enable setting now..."
+    info "正在立即应用开启设置..."
     apply_runtime_value 0
-    ok "IPv6 is enabled now."
+    ok "IPv6 已开启。"
 
     report_other_persistent_disables
 }
@@ -190,17 +190,17 @@ read_flag() {
     if [ -r "$path" ]; then
         sed -n '1p' "$path" 2>/dev/null
     else
-        printf '%s' "unknown"
+        printf '%s' "未知"
     fi
 }
 
 print_runtime_flags() {
     if ! ipv6_kernel_available; then
-        printf 'Kernel IPv6 controls: unavailable\n'
+        printf '内核 IPv6 控制：不可用\n'
         return
     fi
 
-    printf 'Runtime disable flags:\n'
+    printf '运行时关闭标志：\n'
     for name in all default lo; do
         path="/proc/sys/net/ipv6/conf/${name}/disable_ipv6"
         [ -e "$path" ] || continue
@@ -216,7 +216,7 @@ print_runtime_flags() {
             all|default|lo) continue ;;
         esac
         if [ "$printed_header" -eq 0 ]; then
-            printf 'Interface disable flags:\n'
+            printf '网卡关闭标志：\n'
             printed_header=1
         fi
         printf '  %-10s %s\n' "$name" "$(read_flag "$path")"
@@ -224,14 +224,14 @@ print_runtime_flags() {
 }
 
 print_ipv6_addresses() {
-    printf 'IPv6 addresses:\n'
+    printf 'IPv6 地址：\n'
 
     if command -v ip >/dev/null 2>&1; then
         addr_output=$(ip -6 addr show 2>/dev/null)
         if [ -n "$addr_output" ]; then
             printf '%s\n' "$addr_output" | sed 's/^/  /'
         else
-            printf '  none\n'
+            printf '  无\n'
         fi
         if [ $? -eq 0 ]; then
             return
@@ -240,30 +240,30 @@ print_ipv6_addresses() {
 
     if [ -r /proc/net/if_inet6 ]; then
         if [ ! -s /proc/net/if_inet6 ]; then
-            printf '  none\n'
+            printf '  无\n'
             return
         fi
-        awk '{ print "  " $6 "  " $1 }' /proc/net/if_inet6 2>/dev/null || printf '  unable to read\n'
+        awk '{ print "  " $6 "  " $1 }' /proc/net/if_inet6 2>/dev/null || printf '  无法读取\n'
         return
     fi
 
-    printf '  unavailable\n'
+    printf '  不可用\n'
 }
 
 print_ipv6_routes() {
-    printf 'IPv6 default route:\n'
+    printf 'IPv6 默认路由：\n'
 
     if command -v ip >/dev/null 2>&1; then
         route_output=$(ip -6 route show default 2>/dev/null)
         if [ -n "$route_output" ]; then
             printf '%s\n' "$route_output" | sed 's/^/  /'
         else
-            printf '  none\n'
+            printf '  无\n'
         fi
         return
     fi
 
-    printf '  ip command unavailable\n'
+    printf '  ip 命令不可用\n'
 }
 
 report_other_persistent_disables() {
@@ -275,7 +275,7 @@ report_other_persistent_disables() {
 
         if grep -Eq '^[[:space:]]*net\.ipv6\.conf\..*\.disable_ipv6[[:space:]]*=[[:space:]]*1([[:space:]]*#.*)?$' "$file" 2>/dev/null; then
             if [ "$found" -eq 0 ]; then
-                warn "Other persistent IPv6 disable entries still exist:"
+                warn "仍检测到其他永久关闭 IPv6 的配置："
                 found=1
             fi
             printf '  %s\n' "$file"
@@ -283,23 +283,23 @@ report_other_persistent_disables() {
     done
 
     if [ "$found" -ne 0 ]; then
-        warn "Review those files if IPv6 becomes disabled again after reboot."
+        warn "如果重启后 IPv6 又被关闭，请检查这些文件。"
     fi
 }
 
 status() {
-    printf '%s\n' "${BOLD}IPv6 status${RESET}"
-    printf 'Managed persistent config: '
+    printf '%s\n' "${BOLD}IPv6 状态${RESET}"
+    printf '本脚本管理的永久配置：'
     if [ -f "$MANAGED_SYSCTL_FILE" ]; then
-        printf '%s\n' "present ($MANAGED_SYSCTL_FILE)"
+        printf '%s\n' "存在（$MANAGED_SYSCTL_FILE）"
     else
-        printf '%s\n' "absent"
+        printf '%s\n' "不存在"
     fi
 
     if ipv6_kernel_available; then
-        printf 'Kernel IPv6 controls: available\n'
+        printf '内核 IPv6 控制：可用\n'
     else
-        printf 'Kernel IPv6 controls: unavailable\n'
+        printf '内核 IPv6 控制：不可用\n'
     fi
 
     print_runtime_flags
@@ -310,14 +310,14 @@ status() {
 
 menu() {
     while :; do
-        printf '\n%s\n' "${BOLD}IPv6 one-click menu${RESET}"
-        printf '  1) IPv6 status\n'
-        printf '  2) Disable IPv6 temporarily\n'
-        printf '  3) Disable IPv6 permanently\n'
-        printf '  4) Enable IPv6 temporarily\n'
-        printf '  5) Enable IPv6 permanently\n'
-        printf '  0) Exit\n'
-        printf 'Choose an option: '
+        printf '\n%s\n' "${BOLD}IPv6 一键菜单${RESET}"
+        printf '  1) 查看 IPv6 状态\n'
+        printf '  2) 临时关闭 IPv6\n'
+        printf '  3) 永久关闭 IPv6\n'
+        printf '  4) 临时开启 IPv6\n'
+        printf '  5) 永久开启 IPv6\n'
+        printf '  0) 退出\n'
+        printf '请选择：'
         read choice || exit 1
 
         case "$choice" in
@@ -327,7 +327,7 @@ menu() {
             4) enable_temp ;;
             5) enable_perm ;;
             0) exit 0 ;;
-            *) warn "Invalid option: $choice" ;;
+            *) warn "无效选项：$choice" ;;
         esac
     done
 }
@@ -355,7 +355,7 @@ case "${1:-}" in
         usage
         ;;
     *)
-        err "Unknown command: $1"
+        err "未知命令：$1"
         usage
         exit 1
         ;;
