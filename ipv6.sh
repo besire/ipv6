@@ -33,7 +33,8 @@ ${BOLD}IPv6 控制脚本${RESET}
 
 用法:
   ./${SCRIPT_NAME}                 交互菜单
-  ./${SCRIPT_NAME} status          查看 IPv6 状态
+  ./${SCRIPT_NAME} status          简洁查看 IPv6 状态
+  ./${SCRIPT_NAME} status-full     查看 IPv6 详细状态
   ./${SCRIPT_NAME} disable-temp    临时关闭 IPv6，重启或网络重载后可能恢复
   ./${SCRIPT_NAME} disable-perm    永久关闭 IPv6，并立即生效
   ./${SCRIPT_NAME} enable-temp     临时开启 IPv6
@@ -289,6 +290,34 @@ report_other_persistent_disables() {
 
 status() {
     printf '%s\n' "${BOLD}IPv6 状态${RESET}"
+
+    if ! ipv6_kernel_available; then
+        printf '当前状态：不可用\n'
+        printf '原因：当前内核或容器未暴露 IPv6 控制接口\n'
+        return
+    fi
+
+    all_flag=$(read_flag /proc/sys/net/ipv6/conf/all/disable_ipv6)
+    default_flag=$(read_flag /proc/sys/net/ipv6/conf/default/disable_ipv6)
+
+    if [ "$all_flag" = "1" ] && [ "$default_flag" = "1" ]; then
+        printf '当前状态：已关闭\n'
+    else
+        printf '当前状态：已开启\n'
+    fi
+
+    printf '永久配置：'
+    if [ -f "$MANAGED_SYSCTL_FILE" ]; then
+        printf '%s\n' "已设置关闭"
+    else
+        printf '%s\n' "未设置"
+    fi
+
+    report_other_persistent_disables
+}
+
+status_full() {
+    printf '%s\n' "${BOLD}IPv6 详细状态${RESET}"
     printf '本脚本管理的永久配置：'
     if [ -f "$MANAGED_SYSCTL_FILE" ]; then
         printf '%s\n' "存在（$MANAGED_SYSCTL_FILE）"
@@ -316,6 +345,7 @@ menu() {
         printf '  3) 永久关闭 IPv6\n'
         printf '  4) 临时开启 IPv6\n'
         printf '  5) 永久开启 IPv6\n'
+        printf '  6) 查看详细状态\n'
         printf '  0) 退出\n'
         printf '请选择：'
         read choice || exit 1
@@ -326,6 +356,7 @@ menu() {
             3) disable_perm ;;
             4) enable_temp ;;
             5) enable_perm ;;
+            6) status_full ;;
             0) exit 0 ;;
             *) warn "无效选项：$choice" ;;
         esac
@@ -338,6 +369,9 @@ case "${1:-}" in
         ;;
     status)
         status
+        ;;
+    status-full|full-status|detail|details)
+        status_full
         ;;
     disable-temp|temporary-disable|temp-disable)
         disable_temp

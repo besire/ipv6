@@ -66,7 +66,8 @@ sudo ./ipv6.sh enable-perm
 ## 命令说明
 
 ```text
-status          查询 IPv6 当前状态
+status          简洁查询 IPv6 当前状态
+status-full     查询 IPv6 详细状态
 disable-temp    临时关闭 IPv6，重启或网络服务重载后可能恢复
 disable-perm    永久关闭 IPv6，并立即应用
 enable-temp     临时开启 IPv6
