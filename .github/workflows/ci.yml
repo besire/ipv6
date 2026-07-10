@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax
+        run: |
+          for file in ipv6.sh tests/test.sh; do
+            sh -n "$file"
+            dash -n "$file"
+            bash -n "$file"
+          done
+
+      - name: Tests
+        run: |
+          sh tests/test.sh
+          dash tests/test.sh
+          bash tests/test.sh
+
+      - name: ShellCheck
+        run: shellcheck -x --shell=sh ipv6.sh tests/test.sh

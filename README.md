@@ -1,82 +1,110 @@
-# IPv6 One-Click Script
+# IPv6 Control
 
-一个 Linux IPv6 一键管理脚本，支持：
+一个简单的 Linux IPv6 管理脚本，使用 POSIX `sh` 编写，支持状态查询、临时启停、永久启停以及交互菜单。
 
-- IPv6 状态查询
-- 临时关闭 IPv6
-- 永久关闭 IPv6
-- 临时开启 IPv6
-- 永久开启 IPv6
-- 交互菜单和命令行参数两种模式
+## 功能
 
-## 支持系统
+- 查询当前网络命名空间的 IPv6 内核开关。
+- 显示各接口标志、IPv6 地址和默认路由。
+- 临时开启或关闭现有接口以及新接口默认值。
+- 通过 `/etc/sysctl.d/99-ipv6-control.conf` 保存永久关闭配置。
+- 只删除内容完整匹配的本工具配置，不覆盖或删除同名的其他文件。
+- 写入每个运行时标志后立即回读校验，失败时返回非零状态。
 
-适用于常见 Linux 发行版，包括 Debian、Ubuntu、CentOS、RHEL、Rocky Linux、AlmaLinux、Fedora、Arch Linux、Alpine 等。
+## 环境要求
 
-脚本通过 Linux 内核的 `/proc/sys/net/ipv6/conf/*/disable_ipv6` 和 `/etc/sysctl.d/99-ipv6-control.conf` 工作，不依赖 systemd，因此也兼容 OpenRC、BusyBox 环境中的多数场景。
+- Linux，并提供 `/proc/sys/net/ipv6/conf`。
+- POSIX 兼容的 `/bin/sh`，例如 `dash`、BusyBox `ash` 或 Bash。
+- 修改操作需要 `root`，并要求 `/proc/sys` 可写。
+- 常见基础命令：`id`、`sed`、`awk`、`grep`、`cmp`、`mktemp`、`mkdir`、`mv`、`rm`、`chmod`。
+- `ip` 为详细地址和路由查询的可选依赖。
 
-## 使用方法
+永久配置要在重启后生效，系统启动时必须加载 `/etc/sysctl.d/*.conf`。脚本不依赖 systemd，也不会执行 `sysctl --system`。
 
-GitHub 一键执行交互菜单：
+## 使用
 
-```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh)
-```
-
-GitHub 一键永久关闭 IPv6：
-
-```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh) disable-perm
-```
-
-GitHub 一键永久开启 IPv6：
+推荐先安全下载到临时文件，再执行：
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh) enable-perm
+(
+  script=$(mktemp) || exit 1
+  trap 'rm -f "$script"' 0
+  curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o "$script" &&
+  sh -n "$script" &&
+  sudo sh "$script"
+)
 ```
 
-如果你想要最稳妥、兼容性更高的写法，也可以先下载再执行：
+执行指定命令时，在最后添加参数：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/besire/ipv6/main/ipv6.sh -o /tmp/ipv6.sh && chmod +x /tmp/ipv6.sh && sudo /tmp/ipv6.sh
+sudo sh ipv6.sh disable-perm
+sudo sh ipv6.sh enable-perm
+sh ipv6.sh status
+sh ipv6.sh status-full
 ```
 
-本地执行：
+也可以直接执行：
 
 ```sh
 chmod +x ipv6.sh
 ./ipv6.sh
 ```
 
-状态查询不需要 root：
+## 命令
 
-```sh
-./ipv6.sh status
-```
+| 命令 | 说明 | root |
+| --- | --- | --- |
+| `status` | 简洁显示内核开关和永久配置 | 否 |
+| `status-full` | 显示所有标志、地址和默认路由 | 否 |
+| `disable-temp` | 临时关闭 IPv6 | 是 |
+| `disable-perm` | 安装永久关闭配置并立即关闭 | 是 |
+| `enable-temp` | 临时开启 IPv6 | 是 |
+| `enable-perm` | 删除本工具配置并立即开启 | 是 |
+| `version` | 显示版本 | 否 |
+| `help` | 显示帮助 | 否 |
 
-关闭或开启 IPv6 需要 root：
+退出码：`0` 成功，`1` 操作失败，`2` 参数错误。
 
-```sh
-sudo ./ipv6.sh disable-temp
-sudo ./ipv6.sh disable-perm
-sudo ./ipv6.sh enable-temp
-sudo ./ipv6.sh enable-perm
-```
+## 状态说明
 
-## 命令说明
+`status` 根据实际接口的 `disable_ipv6` 值显示：
+
+- `已开启`：所有当前接口均为 `0`。
+- `已关闭`：所有当前接口均为 `1`。
+- `部分关闭`：当前接口同时存在 `0` 和 `1`。
+- `未知`：没有接口或某个值无法读取。
+
+该状态只表示内核开关，不代表已经获得 IPv6 地址、路由、DNS 或公网连通性。请使用 `status-full` 继续检查。
+
+## 永久配置保护
+
+本工具只管理以下固定文件：
 
 ```text
-status          简洁查询 IPv6 当前状态
-status-full     查询 IPv6 详细状态
-disable-temp    临时关闭 IPv6，重启或网络服务重载后可能恢复
-disable-perm    永久关闭 IPv6，并立即应用
-enable-temp     临时开启 IPv6
-enable-perm     删除本脚本创建的永久关闭配置，并立即开启 IPv6
-help            显示帮助
+/etc/sysctl.d/99-ipv6-control.conf
 ```
 
-## 注意事项
+如果该路径已经存在，但内容不是本工具生成的完整配置，`disable-perm` 和 `enable-perm` 都会拒绝操作。旧版本生成且未修改的五行配置仍可识别和删除。
 
-`enable-perm` 只会删除本脚本创建的 `/etc/sysctl.d/99-ipv6-control.conf`。如果系统里其他配置文件也写了 `net.ipv6.conf.*.disable_ipv6 = 1`，脚本会在开启后提示这些文件，需要你按实际情况检查。
+`enable-perm` 不会删除其他 sysctl 文件。如果系统中还有其他 `disable_ipv6 = 1`，脚本会提示对应文件。
 
-如果系统内核或容器环境没有暴露 IPv6 控制路径，脚本会提示 IPv6 kernel controls unavailable。
+## 注意
+
+- 通过 IPv6 SSH 执行关闭操作可能立即断开当前连接，请准备 IPv4 或控制台恢复方式。
+- 关闭操作包含 `lo`，依赖 `::1` 的本机服务可能受到影响。
+- 容器内即使 UID 为 `0`，也可能因为缺少能力或 `/proc/sys` 只读而失败。
+- 设置 `NO_COLOR=1` 可关闭颜色输出。
+- 永久配置写入成功但立即应用失败时，命令返回 `1`，配置文件会保留。
+- 永久配置删除成功但立即开启失败时，命令返回 `1`，配置文件仍保持已删除。
+
+## 测试
+
+测试只使用临时目录，不修改真实网络或 `/etc`：
+
+```sh
+sh tests/test.sh
+dash tests/test.sh
+bash tests/test.sh
+shellcheck -x --shell=sh ipv6.sh tests/test.sh
+```
